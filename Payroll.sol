@@ -1,4 +1,4 @@
- pragma solidity ^0.4.21;
+ pragma solidity ^0.4.24;
 
 
  import './SafeMath.sol';
@@ -30,19 +30,31 @@
 
 
     modifier employeeExist(address emplid){
-        var checkempl =employees[emplid];
+        var checkempl = employees[emplid];
         assert(checkempl.id != 0x0);
         _;
     }
 
     modifier idNotExist(address emplid){
-        var checkempl =employees[emplid];
+        var checkempl = employees[emplid];
         assert(checkempl.id == 0x0);
         _;
     }
 
     /////////////////////////////////////////////////////////////////
     /////////////////////////// Functions ///////////////////////////
+
+
+    /*
+     *  The Ownable sets the original `owner` of the contract to the sender
+     */
+    // function Payroll(){
+    //     owner = msg.sender;
+    // }
+
+    function _hasEnoughToPayPersonally(Employee empl) private returns(bool){
+        return this.balance.div(empl.salary) > 0;
+    }
 
 
     function _partialPaid(Employee empl) private{
@@ -63,9 +75,6 @@
         return calculateRunway() >= 1;
     }
 
-    function _hasEnoughToPayPersonally(Employee empl) private returns(bool){
-        return this.balance.div(empl.salary) > 0;
-    }
 
     function addEmployee(address emplid, uint sal) onlyOwner idNotExist(emplid) {
         var checkempl = employees[emplid];
