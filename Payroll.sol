@@ -1,11 +1,5 @@
-/*
- * 智能合约 第四课作业
- * 宁达非
- *
- */
+ pragma solidity ^0.4.21;
 
-
- pragma solidity ^0.4.4;
 
  import './SafeMath.sol';
  import './Ownable.sol';
@@ -20,15 +14,20 @@
         uint       lastPayday;
     }
 
-    uint constant                   payDuration = 10 seconds;
-    address                         owner;
-    uint                            totalsalary = 0;
-    mapping(address => Employee)    public employees;
+    uint                          constant   payDuration = 10 seconds;
+    address                                  owner;
+    uint                                     totalsalary = 0;
+    mapping(address => Employee)  public     employees;
 
 
     /////////////////////////////////////////////////////////////////
-    /////////////////////////// Modifier ////////////////////////////
+    /////////////////////////// Events //////////////////////////////
+
+
+
     /////////////////////////////////////////////////////////////////
+    /////////////////////////// Modifiers ///////////////////////////
+
 
     modifier employeeExist(address emplid){
         var checkempl =employees[emplid];
@@ -44,7 +43,7 @@
 
     /////////////////////////////////////////////////////////////////
     /////////////////////////// Functions ///////////////////////////
-    /////////////////////////////////////////////////////////////////
+
 
     function _partialPaid(Employee empl) private{
         uint payment = empl.salary.mul((now.sub(empl.lastPayday)).div(payDuration));
