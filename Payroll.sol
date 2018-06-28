@@ -1,110 +1,116 @@
-pragma solidity ^0.4.24;
+/*
+ * 智能合约 第四课作业
+ * 宁达非
+ *
+ */
 
-contract Payroll {
+
+ pragma solidity ^0.4.4;
+
+ import './SafeMath.sol';
+ import './Ownable.sol';
+
+ contract Payroll is Ownable {
+
+    using SafeMath for uint256;
 
     struct Employee {
-        address id;
-        uint salary;
-        uint lastPayday;
+        address    id;
+        uint       salary;
+        uint       lastPayday;
     }
-    
-    uint Totalsalary = 0;
 
-    uint constant payDuration = 10 seconds;
-    address       owner;
-    Employee[]    employees;
-    event         log(string);
+    uint constant                   payDuration = 10 seconds;
+    address                         owner;
+    uint                            totalsalary = 0;
+    mapping(address => Employee)    public employees;
 
-    function Payroll() {
-        owner = msg.sender;
+
+    /////////////////////////////////////////////////////////////////
+    /////////////////////////// Modifier ////////////////////////////
+    /////////////////////////////////////////////////////////////////
+
+    modifier employeeExist(address emplid){
+        var checkempl =employees[emplid];
+        assert(checkempl.id != 0x0);
+        _;
     }
+
+    modifier idNotExist(address emplid){
+        var checkempl =employees[emplid];
+        assert(checkempl.id == 0x0);
+        _;
+    }
+
+    /////////////////////////////////////////////////////////////////
+    /////////////////////////// Functions ///////////////////////////
+    /////////////////////////////////////////////////////////////////
 
     function _partialPaid(Employee empl) private{
-        if(hasEnoughFund()){
-            uint payment = empl.salary * (now - empl.lastPayday) / payDuration;
-            empl.id.transfer(payment);
-        }else{ revert();} //之前觉得不用require是为了省gas
+        uint payment = empl.salary.mul((now.sub(empl.lastPayday)).div(payDuration));
+        assert(_hasEnoughToPayPersonally(empl));
+        empl.id.transfer(payment);
     }
-
-    function _findEmployee(address emplid) private returns (Employee, uint){
-        for(uint i = 0; i < employees.length; i++){
-            // if address exists, return info binding the address
-            if(employees[i].id == emplid){
-                return (employees[i], i);
-            }
-            // if it doesnt exist, it will return (0x0, 0, 0)
-        }
-    }
-    
-    function addEmployee(address emplid, uint sal){
-    require(msg.sender == owner);
-    var(checkempl, index) = _findEmployee(emplid);
-    require(checkempl.id == 0x0);
-    employees.push(Employee(emplid,sal * 1 ether,now));
-
-    // 添加:
-    Totalsalary += sal * 1 ether;
-}
-
-    function updateEmployee(address emplid, uint Sal) {
-        require(msg.sender == owner);
-        var(checkempl, index) = _findEmployee(emplid);
-        require(checkempl.id != 0x0);
-        _partialPaid(employees[index]);
-
-        //添加：
-        Totalsalary -= employees[index].salary;
-        Totalsalary += Sal * 1 ether;
-
-        employees[index].salary = Sal * 1 ether;
-        employees[index].lastPayday = now;
-        log("Employee info updated successfully");
-        return;
-    }
-
-    function removeEmployee(address emplid){
-        require(msg.sender == owner);
-        var(checkempl, index) = _findEmployee(emplid);
-        require(checkempl.id != 0x0);
-        _partialPaid(employees[index]);
-
-        //添加：
-        Totalsalary -= employees[index].salary;
-
-        delete employees[index];
-        employees[index] = employees[employees.length -1];
-        employees.length -= 1;
-        return;
-    }
-
-
 
     function addFund() payable returns (uint) {
         return this.balance;
     }
 
     function calculateRunway() returns (uint) {
-        return this.balance / Totalsalary;
+        return this.balance.div(totalsalary);
     }
 
     function hasEnoughFund() returns (bool) {
         return calculateRunway() >= 1;
     }
 
-    function getPaid() {
-        var(checkempl, index) = _findEmployee(msg.sender);
-        require(checkempl.id != 0x0);
-        uint nextPayday = checkempl.lastPayday + payDuration;
-
-        if (nextPayday > now){revert();}
-
-        require(hasEnoughFund());
-        employees[index].lastPayday = nextPayday;
-        employees[index].id.transfer(employees[index].salary);
+    function _hasEnoughToPayPersonally(Employee empl) private returns(bool){
+        return this.balance.div(empl.salary) > 0;
     }
 
-    
-}
+    function addEmployee(address emplid, uint sal) onlyOwner idNotExist(emplid) {
+        var checkempl = employees[emplid];
+        totalsalary = totalsalary.add(sal * 1 ether);
+        employees[emplid] = Employee(emplid, sal * 1 ether, now);
+    }
 
+    function removeEmployee(address emplid) onlyOwner employeeExist(emplid) {
+        var checkempl =employees[emplid];
+        _partialPaid(employees[emplid]);
+        totalsalary = totalsalary.sub(employees[emplid].salary);
+        delete employees[emplid];
+    }
+
+    function getPaid() employeeExist(msg.sender) {
+        var checkempl =employees[msg.sender];
+        uint nextPayday = checkempl.lastPayday + payDuration;
+        if (nextPayday > now){revert();}
+        assert(_hasEnoughToPayPersonally(checkempl));
+        employees[msg.sender].lastPayday = nextPayday;
+        employees[msg.sender].id.transfer(employees[msg.sender].salary);
+    }
+
+    function updateEmployee(address emplid, uint Sal) onlyOwner employeeExist(emplid) {
+        var checkempl = employees[emplid];
+        _partialPaid(employees[emplid]);
+        totalsalary = totalsalary.sub(employees[emplid].salary);
+        totalsalary = totalsalary.add(Sal * 1 ether);
+        employees[emplid].salary = Sal * 1 ether;
+        employees[emplid].lastPayday = now;
+        return;
+    }
+
+    function checkEmployee(address emplid) returns (uint salary, uint lastPayday){
+        var employee = employees[emplid];
+        salary = employee.salary;
+        lastPayday = employee.lastPayday;
+    }
+
+    function changePaymentAddress (address newEmplid) employeeExist(msg.sender) idNotExist (newEmplid){
+        var checkempl = employees[msg.sender];
+        employees[msg.sender].id = newEmplid;
+    }
+
+}
 
 
